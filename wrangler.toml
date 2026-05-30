@@ -1,0 +1,6 @@
+name = "hh-job-search"
+compatibility_date = "2025-12-01"
+
+[assets]
+directory = "dist"
+not_found_handling = "single-page-application"
