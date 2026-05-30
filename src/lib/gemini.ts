@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getGeminiModel } from "./storage";
 
 export interface ExtractedResume {
   position: string;
@@ -8,6 +9,16 @@ export interface ExtractedResume {
   area_name: string;
   searchText: string;
 }
+
+export const GEMINI_MODELS = [
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash (быстрая, free tier)" },
+  { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite (самая быстрая)" },
+  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro (точнее, нужен платный)" },
+  { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash (deprecated)" },
+  { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash (legacy)" }
+] as const;
+
+export const DEFAULT_MODEL = "gemini-2.5-flash";
 
 const PROMPT = `Ты — ассистент по подбору вакансий на hh.ru. Тебе дан текст резюме.
 Извлеки структурированно и верни СТРОГО JSON без markdown-обёрток и без пояснений:
@@ -31,8 +42,9 @@ export async function extractResume(
   resumeText: string
 ): Promise<ExtractedResume> {
   const genAI = new GoogleGenerativeAI(apiKey);
+  const modelId = getGeminiModel() || DEFAULT_MODEL;
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: modelId,
     generationConfig: { responseMimeType: "application/json" }
   });
   const prompt = PROMPT.replace("{RESUME}", resumeText.slice(0, 30000));

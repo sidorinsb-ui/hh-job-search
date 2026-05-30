@@ -17,6 +17,23 @@ export function setGeminiKey(key: string): void {
   }
 }
 
+export function getGeminiModel(): string {
+  try {
+    return localStorage.getItem(PREFIX + "gemini-model") || "";
+  } catch {
+    return "";
+  }
+}
+
+export function setGeminiModel(model: string): void {
+  try {
+    if (model) localStorage.setItem(PREFIX + "gemini-model", model);
+    else localStorage.removeItem(PREFIX + "gemini-model");
+  } catch {
+    // ignore
+  }
+}
+
 export function getFavorites(): string[] {
   try {
     return JSON.parse(localStorage.getItem(PREFIX + "favorites") || "[]");

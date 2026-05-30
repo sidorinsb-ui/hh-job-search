@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { getGeminiKey, setGeminiKey } from "../lib/storage";
+import {
+  getGeminiKey,
+  setGeminiKey,
+  getGeminiModel,
+  setGeminiModel
+} from "../lib/storage";
+import { GEMINI_MODELS, DEFAULT_MODEL } from "../lib/gemini";
 
 export default function SettingsDialog({
   open,
@@ -10,15 +16,20 @@ export default function SettingsDialog({
   onClose: () => void;
 }) {
   const [key, setKey] = useState("");
+  const [model, setModel] = useState<string>(DEFAULT_MODEL);
 
   useEffect(() => {
-    if (open) setKey(getGeminiKey());
+    if (open) {
+      setKey(getGeminiKey());
+      setModel(getGeminiModel() || DEFAULT_MODEL);
+    }
   }, [open]);
 
   if (!open) return null;
 
   function save() {
     setGeminiKey(key.trim());
+    setGeminiModel(model);
     onClose();
   }
 
@@ -67,6 +78,25 @@ export default function SettingsDialog({
             . Ключ хранится только в вашем браузере (localStorage) и используется
             для запроса напрямую к Google.
           </p>
+
+          <label className="block">
+            <span className="text-sm font-medium">Модель Gemini</span>
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
+            >
+              {GEMINI_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-500 mt-1">
+              Если получаете 429 «quota exceeded» — переключитесь на 2.5 Flash или
+              2.5 Flash Lite. Free-tier лимиты Google меняются.
+            </p>
+          </label>
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
