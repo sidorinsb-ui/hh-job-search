@@ -57,7 +57,8 @@ export interface SearchResponse {
 export async function searchVacancies(
   p: VacancySearchParams
 ): Promise<SearchResponse> {
-  const url = new URL(BASE + "/vacancies");
+  // BASE is a relative path (/api/hh) — need an explicit base for URL()
+  const url = new URL(BASE + "/vacancies", window.location.origin);
   if (p.text) url.searchParams.set("text", p.text);
   if (p.area !== undefined && p.area !== "")
     url.searchParams.set("area", String(p.area));
