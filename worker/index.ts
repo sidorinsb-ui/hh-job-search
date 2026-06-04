@@ -17,9 +17,13 @@ interface CachedToken {
 
 let mem: CachedToken | null = null;
 let inflight: Promise<string> | null = null;
+let cooldownUntil = 0; // unix ms; while > Date.now(), do NOT call /oauth/token
+let lastOauthError = "";
 
 const HH_USER_AGENT = "hh-job-search/0.1 (sidorinsb@gmail.com)";
 const TOKEN_CACHE_KEY = "https://hh-job-search.sidorinsb.workers.dev/__internal/oauth-token";
+const COOLDOWN_CACHE_KEY = "https://hh-job-search.sidorinsb.workers.dev/__internal/oauth-cooldown";
+const COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes after a refusal
 const ALLOWED_ROOTS = new Set([
   "vacancies",
   "areas",
@@ -69,9 +73,51 @@ async function writeCachedToken(token: string, ttlSeconds: number): Promise<void
   }
 }
 
+async function readCooldown(): Promise<number> {
+  if (cooldownUntil > Date.now()) return cooldownUntil;
+  try {
+    const cache = (caches as any).default as Cache | undefined;
+    if (!cache) return 0;
+    const r = await cache.match(COOLDOWN_CACHE_KEY);
+    if (!r) return 0;
+    const exp = Number(r.headers.get("X-Expires-At") || "0");
+    if (exp > Date.now()) {
+      cooldownUntil = exp;
+      lastOauthError = (await r.text()) || "previous_refusal";
+      return exp;
+    }
+  } catch {}
+  return 0;
+}
+
+async function setCooldown(reason: string): Promise<void> {
+  cooldownUntil = Date.now() + COOLDOWN_MS;
+  lastOauthError = reason;
+  try {
+    const cache = (caches as any).default as Cache | undefined;
+    if (cache) {
+      await cache.put(
+        COOLDOWN_CACHE_KEY,
+        new Response(reason, {
+          headers: {
+            "Cache-Control": `public, max-age=${Math.floor(COOLDOWN_MS / 1000)}`,
+            "X-Expires-At": String(cooldownUntil),
+            "Content-Type": "text/plain"
+          }
+        })
+      );
+    }
+  } catch {}
+}
+
 async function fetchFreshToken(env: Env): Promise<string> {
   if (!env.HH_CLIENT_ID || !env.HH_CLIENT_SECRET) {
     throw new Error("missing_client_credentials");
+  }
+  const cd = await readCooldown();
+  if (cd > Date.now()) {
+    const left = Math.round((cd - Date.now()) / 1000);
+    throw new Error(`oauth_cooldown ${left}s left, last_reason=${lastOauthError}`);
   }
   const body = new URLSearchParams({
     grant_type: "client_credentials",
@@ -88,7 +134,9 @@ async function fetchFreshToken(env: Env): Promise<string> {
   });
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(`hh_oauth_${res.status}: ${text.slice(0, 300)}`);
+    const reason = `hh_oauth_${res.status}: ${text.slice(0, 200)}`;
+    await setCooldown(reason);
+    throw new Error(reason);
   }
   let j: { access_token?: string; expires_in?: number };
   try {
@@ -174,6 +222,7 @@ export default {
 
       if (url.pathname === "/api/health") {
         const c = await readCachedToken();
+        const cd = await readCooldown();
         return new Response(
           JSON.stringify({
             ok: true,
@@ -181,7 +230,10 @@ export default {
             has_client_secret: Boolean(env.HH_CLIENT_SECRET),
             token_cached: Boolean(c),
             token_expires_at: c?.expiresAt ?? null,
-            ttl_seconds_left: c ? Math.round((c.expiresAt - Date.now()) / 1000) : null
+            ttl_seconds_left: c ? Math.round((c.expiresAt - Date.now()) / 1000) : null,
+            oauth_cooldown_until: cd > Date.now() ? cd : null,
+            oauth_cooldown_seconds_left: cd > Date.now() ? Math.round((cd - Date.now()) / 1000) : 0,
+            last_oauth_error: lastOauthError || null
           }),
           { headers: { "Content-Type": "application/json" } }
         );
