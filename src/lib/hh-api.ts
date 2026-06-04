@@ -1,5 +1,7 @@
-const BASE = "https://api.hh.ru";
-const UA = "hh-job-search/0.1 (https://github.com/sidorinsb-ui/hh-job-search)";
+// Calls go through our Cloudflare Worker proxy at /api/hh/* — the Worker holds
+// the OAuth application token and forwards to api.hh.ru. HH closed anonymous
+// access to /vacancies in 2025, so direct browser calls return 403.
+const BASE = "/api/hh";
 
 export type Experience =
   | "noExperience"
@@ -71,9 +73,7 @@ export async function searchVacancies(
   url.searchParams.set("per_page", String(p.per_page ?? 50));
   url.searchParams.set("page", String(p.page ?? 0));
 
-  const res = await fetch(url.toString(), {
-    headers: { "HH-User-Agent": UA }
-  });
+  const res = await fetch(url.toString());
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`HH API ${res.status}: ${body.slice(0, 200)}`);
@@ -91,9 +91,7 @@ let areasCache: Area[] | null = null;
 
 export async function fetchAreas(): Promise<Area[]> {
   if (areasCache) return areasCache;
-  const res = await fetch(BASE + "/areas", {
-    headers: { "HH-User-Agent": UA }
-  });
+  const res = await fetch(BASE + "/areas");
   if (!res.ok) throw new Error(`HH areas: ${res.status}`);
   areasCache = (await res.json()) as Area[];
   return areasCache;

@@ -33,3 +33,9 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
+          secrets: |
+            HH_CLIENT_ID
+            HH_CLIENT_SECRET
+        env:
+          HH_CLIENT_ID: ${{ secrets.HH_CLIENT_ID }}
+          HH_CLIENT_SECRET: ${{ secrets.HH_CLIENT_SECRET }}

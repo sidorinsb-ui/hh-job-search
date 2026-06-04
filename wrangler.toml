@@ -1,6 +1,9 @@
 name = "hh-job-search"
+main = "worker/index.ts"
 compatibility_date = "2025-12-01"
+compatibility_flags = ["nodejs_compat"]
 
 [assets]
 directory = "dist"
+binding = "ASSETS"
 not_found_handling = "single-page-application"
